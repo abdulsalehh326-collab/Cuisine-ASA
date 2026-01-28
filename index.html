@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cultural Cuisine AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,14 +12,15 @@
         }
     </script>
     <style>
-        body { font-family: sans-serif; background-color: #f3f4f6; }
+        /* MUHIMMI: Wannan yana gyara tsayin waya */
+        body { font-family: sans-serif; background-color: #f3f4f6; height: 100dvh; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="flex flex-col h-screen max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden">
+<body class="flex flex-col h-full max-w-md mx-auto bg-white shadow-2xl overflow-hidden">
 
-    <!-- HEADER -->
-    <header class="bg-white p-4 shadow-sm z-10 flex justify-between items-center border-b">
+    <!-- 1. HEADER (Fixed Top) -->
+    <header class="flex-none bg-white p-4 shadow-sm z-10 flex justify-between items-center border-b">
         <div class="flex items-center gap-2">
             <div class="w-10 h-10 rounded-full bg-brand-orange text-white flex items-center justify-center">
                 <i class="fa-solid fa-hat-chef text-lg"></i>
@@ -32,38 +33,39 @@
         <button id="modeBtn" onclick="toggleMode()" class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 font-medium">Authentic</button>
     </header>
 
-    <!-- CHAT AREA -->
-    <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#E5DDD5] pb-24 hide-scrollbar">
+    <!-- 2. CHAT AREA (Flex Grow - Zai cika tsakiyar) -->
+    <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#E5DDD5] hide-scrollbar">
         <div class="flex justify-start">
-            <div class="bg-white p-3 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl shadow-sm text-sm max-w-[85%]">
+            <div class="bg-white p-3 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl shadow-sm text-sm max-w-[85%] border">
                 Sannu! 👋 Ni ne AI Chef dinka. Tambaye ni recipe (misali: "Yadda ake Jollof Rice").
             </div>
         </div>
     </div>
 
-    <!-- INPUT AREA -->
-    <div class="absolute bottom-0 w-full bg-white p-3 border-t">
+    <!-- 3. INPUT AREA (Flex None - Dole ya zauna a kasa) -->
+    <div class="flex-none w-full bg-white p-3 border-t z-20 pb-safe">
         <div class="flex gap-2 items-center bg-gray-100 px-4 py-2 rounded-full">
             <input type="text" id="userInput" placeholder="Rubuta anan..." class="flex-1 bg-transparent outline-none text-sm" onkeypress="handleEnter(event)">
             <button onclick="sendMessage()" class="text-brand-orange"><i class="fa-solid fa-paper-plane text-xl"></i></button>
         </div>
     </div>
 
-    <!-- COOKING MODAL -->
+    <!-- 4. COOKING MODAL -->
     <div id="cookingModal" class="fixed inset-0 bg-brand-dark z-50 hidden flex-col text-white">
-        <div class="p-4 flex justify-between items-center">
+        <div class="p-4 flex justify-between items-center flex-none">
             <span class="text-xs tracking-widest text-gray-400" id="stepCounter">STEP 1</span>
             <button onclick="closeCooking()" class="bg-white/10 p-2 rounded-full"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="flex-1 flex flex-col justify-center px-6 text-center">
+        <div class="flex-1 flex flex-col justify-center px-6 text-center overflow-y-auto">
             <h2 id="stepText" class="text-2xl font-bold leading-relaxed"></h2>
         </div>
-        <div class="p-6 flex justify-between">
+        <div class="p-6 flex justify-between flex-none pb-12">
             <button onclick="prevStep()" class="p-4 bg-white/10 rounded-full"><i class="fa-solid fa-chevron-left"></i></button>
             <button onclick="nextStep()" class="p-4 bg-brand-orange rounded-full"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
     </div>
 
+    <!-- LOGIC -->
     <script>
         const chatContainer = document.getElementById('chat-container');
         let currentMode = 'Authentic';
@@ -81,7 +83,8 @@
             div.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
             div.innerHTML = `<div class="${sender === 'user' ? 'bg-brand-orange text-white' : 'bg-white text-gray-800'} p-3 rounded-2xl shadow-sm text-sm max-w-[85%] border">${text}</div>`;
             chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            // Auto scroll to bottom
+            setTimeout(() => chatContainer.scrollTop = chatContainer.scrollHeight, 50);
         }
 
         function appendRecipeCard(recipe) {
@@ -97,7 +100,7 @@
                     <button onclick='startCooking(${JSON.stringify(recipe).replace(/'/g, "&#39;")})' class="w-full bg-brand-dark text-white py-3 font-bold">Start Cooking</button>
                 </div>`;
             chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            setTimeout(() => chatContainer.scrollTop = chatContainer.scrollHeight, 50);
         }
 
         async function sendMessage() {
@@ -106,6 +109,7 @@
             if(!text) return;
             appendMessage(text, 'user');
             input.value = '';
+            input.blur(); // Close keyboard on mobile
 
             const loadingDiv = document.createElement('div');
             loadingDiv.id = "loading";
@@ -113,7 +117,6 @@
             chatContainer.appendChild(loadingDiv);
 
             try {
-                // ANAN MUKA CANZA: Muna kiran 'api/chat' maimakon OpenRouter kai tsaye
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -129,7 +132,7 @@
                     appendMessage(data.reply, 'ai');
                 }
             } catch (err) {
-                document.getElementById('loading').remove();
+                if(document.getElementById('loading')) document.getElementById('loading').remove();
                 appendMessage("Error: Could not connect to server.", 'ai');
             }
         }
