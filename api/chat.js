@@ -1,17 +1,27 @@
-export const config = {
-  runtime: 'edge',
-};
+export default async function handler(req, res) {
+  // 1. Setup Headers don gyara CORS (Network Error)
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-export default async function handler(req) {
-  // Karanta saƙon daga index.html
-  const { message, mode } = await req.json();
-
-  // Dauko API Key daga Vercel Environment Variables
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    return new Response(JSON.stringify({ reply: "Server Config Error: API Key missing" }), { status: 500 });
+  // 2. Handle OPTIONS request (Browser Check)
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
+
+  // 3. Tabbatar da API Key
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ reply: "Server Error: API Key is missing in Vercel." });
+  }
+
+  // 4. Karbar Sako
+  const { message, mode } = req.body;
 
   const systemPrompt = `You are a Chef. Mode: ${mode}. 
   If asked for recipe, return JSON ONLY: 
@@ -20,7 +30,7 @@ export default async function handler(req) {
   If chat, return plain text. No markdown.`;
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -28,7 +38,7 @@ export default async function handler(req) {
         "HTTP-Referer": "https://vercel.app", 
       },
       body: JSON.stringify({
-        model: "deepseek/deepseek-r1",
+        model: "deepseek/deepseek-r1:free", 
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message }
@@ -36,27 +46,26 @@ export default async function handler(req) {
       })
     });
 
-    const data = await response.json();
+    const data = await aiResponse.json();
     let content = data.choices[0].message.content;
-
-    // Cire <think> tags na DeepSeek
+    
+    // Cire <think> tags
     content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
-    // Duba ko Recipe ne (JSON)
+    // Duba ko Recipe ne
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
         try {
             const recipe = JSON.parse(jsonMatch[0]);
             if(recipe.type === 'recipe') {
-                return new Response(JSON.stringify({ recipe: recipe }), { status: 200 });
+                return res.status(200).json({ recipe: recipe });
             }
         } catch(e) {}
     }
 
-    // Idan ba recipe bane, rubutu ne
-    return new Response(JSON.stringify({ reply: content }), { status: 200 });
+    return res.status(200).json({ reply: content });
 
   } catch (error) {
-    return new Response(JSON.stringify({ reply: "Network Error" }), { status: 500 });
+    return res.status(500).json({ reply: "Network Error: Failed to connect to AI." });
   }
 }
