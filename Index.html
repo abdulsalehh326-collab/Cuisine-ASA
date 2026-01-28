@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cultural Cuisine AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { brand: { orange: '#FF6B35', dark: '#2E2E3A' } } } }
+        }
+    </script>
+    <style>
+        body { font-family: sans-serif; background-color: #f3f4f6; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="flex flex-col h-screen max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden">
+
+    <!-- HEADER -->
+    <header class="bg-white p-4 shadow-sm z-10 flex justify-between items-center border-b">
+        <div class="flex items-center gap-2">
+            <div class="w-10 h-10 rounded-full bg-brand-orange text-white flex items-center justify-center">
+                <i class="fa-solid fa-hat-chef text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-gray-800 leading-tight">Cuisine AI</h1>
+                <p class="text-[10px] text-green-600 font-bold">● Online</p>
+            </div>
+        </div>
+        <button id="modeBtn" onclick="toggleMode()" class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 font-medium">Authentic</button>
+    </header>
+
+    <!-- CHAT AREA -->
+    <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#E5DDD5] pb-24 hide-scrollbar">
+        <div class="flex justify-start">
+            <div class="bg-white p-3 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl shadow-sm text-sm max-w-[85%]">
+                Sannu! 👋 Ni ne AI Chef dinka. Tambaye ni recipe (misali: "Yadda ake Jollof Rice").
+            </div>
+        </div>
+    </div>
+
+    <!-- INPUT AREA -->
+    <div class="absolute bottom-0 w-full bg-white p-3 border-t">
+        <div class="flex gap-2 items-center bg-gray-100 px-4 py-2 rounded-full">
+            <input type="text" id="userInput" placeholder="Rubuta anan..." class="flex-1 bg-transparent outline-none text-sm" onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()" class="text-brand-orange"><i class="fa-solid fa-paper-plane text-xl"></i></button>
+        </div>
+    </div>
+
+    <!-- COOKING MODAL -->
+    <div id="cookingModal" class="fixed inset-0 bg-brand-dark z-50 hidden flex-col text-white">
+        <div class="p-4 flex justify-between items-center">
+            <span class="text-xs tracking-widest text-gray-400" id="stepCounter">STEP 1</span>
+            <button onclick="closeCooking()" class="bg-white/10 p-2 rounded-full"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="flex-1 flex flex-col justify-center px-6 text-center">
+            <h2 id="stepText" class="text-2xl font-bold leading-relaxed"></h2>
+        </div>
+        <div class="p-6 flex justify-between">
+            <button onclick="prevStep()" class="p-4 bg-white/10 rounded-full"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="nextStep()" class="p-4 bg-brand-orange rounded-full"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        let currentMode = 'Authentic';
+        let currentSteps = [];
+        let currentStepIndex = 0;
+
+        function toggleMode() {
+            currentMode = currentMode === 'Authentic' ? 'Easy' : 'Authentic';
+            document.getElementById('modeBtn').innerText = currentMode;
+        }
+        function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
+
+        function appendMessage(text, sender) {
+            const div = document.createElement('div');
+            div.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            div.innerHTML = `<div class="${sender === 'user' ? 'bg-brand-orange text-white' : 'bg-white text-gray-800'} p-3 rounded-2xl shadow-sm text-sm max-w-[85%] border">${text}</div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendRecipeCard(recipe) {
+            const div = document.createElement('div');
+            div.className = 'flex justify-start w-full';
+            div.innerHTML = `
+                <div class="bg-white rounded-xl shadow-md overflow-hidden w-[90%] border mt-2">
+                    <div class="bg-orange-100 p-3"><h3 class="font-bold text-gray-800">${recipe.title}</h3></div>
+                    <div class="p-3 text-xs space-y-2">
+                        <div class="flex justify-between"><span>⏱ ${recipe.cookTime}</span><span>📊 ${recipe.difficulty}</span></div>
+                        <ul class="list-disc pl-4 text-gray-700">${recipe.ingredients.slice(0,3).map(i=>`<li>${i.item}</li>`).join('')}</ul>
+                    </div>
+                    <button onclick='startCooking(${JSON.stringify(recipe).replace(/'/g, "&#39;")})' class="w-full bg-brand-dark text-white py-3 font-bold">Start Cooking</button>
+                </div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if(!text) return;
+            appendMessage(text, 'user');
+            input.value = '';
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = "loading";
+            loadingDiv.innerHTML = `<div class="text-xs text-gray-500 p-4">Cooking...</div>`;
+            chatContainer.appendChild(loadingDiv);
+
+            try {
+                // ANAN MUKA CANZA: Muna kiran 'api/chat' maimakon OpenRouter kai tsaye
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text, mode: currentMode })
+                });
+
+                const data = await response.json();
+                document.getElementById('loading').remove();
+
+                if(data.recipe) {
+                    appendRecipeCard(data.recipe);
+                } else {
+                    appendMessage(data.reply, 'ai');
+                }
+            } catch (err) {
+                document.getElementById('loading').remove();
+                appendMessage("Error: Could not connect to server.", 'ai');
+            }
+        }
+
+        // Cooking Functions
+        function startCooking(recipe) {
+            currentSteps = recipe.steps;
+            currentStepIndex = 0;
+            updateStep();
+            document.getElementById('cookingModal').classList.remove('hidden');
+            document.getElementById('cookingModal').classList.add('flex');
+        }
+        function closeCooking() {
+            document.getElementById('cookingModal').classList.add('hidden');
+            document.getElementById('cookingModal').classList.remove('flex');
+        }
+        function updateStep() {
+            document.getElementById('stepCounter').innerText = `STEP ${currentStepIndex + 1}/${currentSteps.length}`;
+            const step = currentSteps[currentStepIndex];
+            document.getElementById('stepText').innerText = typeof step === 'object' ? step.instruction : step;
+        }
+        function nextStep() { if(currentStepIndex < currentSteps.length - 1) { currentStepIndex++; updateStep(); } else { closeCooking(); } }
+        function prevStep() { if(currentStepIndex > 0) { currentStepIndex--; updateStep(); } }
+    </script>
+</body>
+</html>
