@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // 1. Setup Headers don gyara CORS (Network Error)
+  // Gyara CORS don kar ya hana waya shiga
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -8,28 +8,28 @@ export default async function handler(req, res) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // 2. Handle OPTIONS request (Browser Check)
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
-  // 3. Tabbatar da API Key
   const apiKey = process.env.OPENROUTER_API_KEY;
+
+  // Duba ko akwai Key
   if (!apiKey) {
-    return res.status(500).json({ reply: "Server Error: API Key is missing in Vercel." });
+    return res.status(500).json({ reply: "Error: API Key is missing in Vercel Settings." });
   }
 
-  // 4. Karbar Sako
   const { message, mode } = req.body;
 
-  const systemPrompt = `You are a Chef. Mode: ${mode}. 
-  If asked for recipe, return JSON ONLY: 
-  {"type":"recipe","title":"Name","origin":"Place","cookTime":"min","difficulty":"Level",
-  "ingredients":[{"item":"name","amount":"qty"}],"steps":["Step 1","Step 2"]}. 
-  If chat, return plain text. No markdown.`;
+  const systemPrompt = `You are a professional Chef. Mode: ${mode}. 
+  IMPORTANT:
+  1. If asked for a recipe, you MUST return a JSON Object ONLY. No text before or after.
+  Format: {"type":"recipe","title":"...","origin":"...","cookTime":"...","difficulty":"...","ingredients":[{"item":"...","amount":"..."}],"steps":["..."]}
+  2. If asked a general question, return plain text.`;
 
   try {
+    // NA CANZA MODEL ZUWA GEMINI (MAI SAURI)
     const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         "HTTP-Referer": "https://vercel.app", 
       },
       body: JSON.stringify({
-        model: "deepseek/deepseek-r1:free", 
+        model: "google/gemini-2.0-flash-lite-preview-02-05:free", 
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message }
@@ -47,17 +47,27 @@ export default async function handler(req, res) {
     });
 
     const data = await aiResponse.json();
+
+    // Idan OpenRouter ya dawo da Error
+    if (data.error) {
+       console.error("OpenRouter Error:", data.error);
+       return res.status(500).json({ reply: "AI Error: " + data.error.message });
+    }
+
     let content = data.choices[0].message.content;
     
-    // Cire <think> tags
+    // Cire <think> idan ya fito (ko da yake Gemini baya yi)
     content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    
+    // Cire ```json da ``` idan sun fito
+    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    // Duba ko Recipe ne
+    // Duba ko Recipe ne (JSON)
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
         try {
             const recipe = JSON.parse(jsonMatch[0]);
-            if(recipe.type === 'recipe') {
+            if(recipe.type === 'recipe' || recipe.ingredients) {
                 return res.status(200).json({ recipe: recipe });
             }
         } catch(e) {}
@@ -66,6 +76,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ reply: content });
 
   } catch (error) {
-    return res.status(500).json({ reply: "Network Error: Failed to connect to AI." });
+    console.error("Server Error:", error);
+    return res.status(500).json({ reply: "Connection Error: Please try again." });
   }
 }
